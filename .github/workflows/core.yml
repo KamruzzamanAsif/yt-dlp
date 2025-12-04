@@ -64,6 +64,30 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install test requirements
       run: python ./devscripts/install_deps.py --include-group test --include-group curl-cffi
+    
+    # ---------- INSERT COVERAGE WRAPPER HERE ----------
+    - name: Install coverage
+      run: pip install coverage
+
+    - name: Create coverage wrapper for python
+      run: |
+        echo '#!/bin/bash' > python
+        echo 'coverage run --parallel-mode "$@"' >> python
+        chmod +x python
+
+        echo '#!/bin/bash' > python3
+        echo 'coverage run --parallel-mode "$@"' >> python3
+        chmod +x python3
+
+        export PATH="${PWD}:$PATH"
+
+        echo "[run]" > .coveragerc
+        echo "parallel = True" >> .coveragerc
+        echo "branch = True" >> .coveragerc
+        echo "source = ." >> .coveragerc
+        export COVERAGE_PROCESS_START=$(pwd)/.coveragerc
+    # ---------------------------------------------------
+
     - name: Run tests
       timeout-minutes: 15
       continue-on-error: False
@@ -89,3 +113,10 @@ jobs:
         fi
         python3 -m yt_dlp -v || true  # Print debug head
         python3 -m devscripts.run_tests "${flags[@]}" --pytest-args '--reruns 2 --reruns-delay 3.0' core
+    
+    # ---------- INSERT COVERAGE WRAPPER HERE ----------
+    - name: Combine and export coverage
+      run: |
+        coverage combine
+        coverage json -o coverage.json
+        cat coverage.json | head
