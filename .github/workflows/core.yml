@@ -131,3 +131,12 @@ jobs:
         coverage combine || true
         coverage json -o coverage.json || true
         ls -lh coverage.json || true
+    
+    - name: Print head of coverage
+      run: head coverage.json
+    
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage.json
