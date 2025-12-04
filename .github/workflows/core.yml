@@ -65,27 +65,38 @@ jobs:
     - name: Install test requirements
       run: python ./devscripts/install_deps.py --include-group test --include-group curl-cffi
     
-    # ---------- INSERT COVERAGE WRAPPER HERE ----------
+        # ---------- INSERT COVERAGE WRAPPER HERE ----------
     - name: Install coverage
       run: pip install coverage
 
-    - name: Create coverage wrapper for python
+    - name: Prepare python coverage wrappers
       run: |
-        echo '#!/bin/bash' > python
-        echo 'coverage run --parallel-mode "$@"' >> python
-        chmod +x python
+        mkdir -p pywrap
+        cd pywrap
 
-        echo '#!/bin/bash' > python3
-        echo 'coverage run --parallel-mode "$@"' >> python3
-        chmod +x python3
+        # Create universal wrapper
+        echo '#!/bin/bash' > wrapper
+        echo 'coverage run --parallel-mode "$@"' >> wrapper
+        chmod +x wrapper
 
-        export PATH="${PWD}:$PATH"
+        # Create wrappers for all python variants we may encounter
+        for exe in python python3 python3.8 python3.9 python3.10 python3.11 python3.12 python3.13 python3.14; do
+          cp wrapper "$exe"
+        done
 
+    - name: Activate coverage wrappers
+      run: |
+        # Add pywrap directory to global PATH across steps
+        echo "$PWD/pywrap" >> $GITHUB_PATH
+
+        # Create coverage configuration
         echo "[run]" > .coveragerc
         echo "parallel = True" >> .coveragerc
         echo "branch = True" >> .coveragerc
         echo "source = ." >> .coveragerc
-        export COVERAGE_PROCESS_START=$(pwd)/.coveragerc
+
+        # Export as job-level environment variable
+        echo "COVERAGE_PROCESS_START=$(pwd)/.coveragerc" >> $GITHUB_ENV
     # ---------------------------------------------------
 
     - name: Run tests
@@ -113,10 +124,10 @@ jobs:
         fi
         python3 -m yt_dlp -v || true  # Print debug head
         python3 -m devscripts.run_tests "${flags[@]}" --pytest-args '--reruns 2 --reruns-delay 3.0' core
-    
+
     # ---------- INSERT COVERAGE WRAPPER HERE ----------
     - name: Combine and export coverage
       run: |
-        coverage combine
-        coverage json -o coverage.json
-        cat coverage.json | head
+        coverage combine || true
+        coverage json -o coverage.json || true
+        ls -lh coverage.json || true
